@@ -18,7 +18,7 @@ print("🚀 URL-Analyzer starting — built by Corentin COUSTY")
 
 # Checking for the VirusTotal API key
 if not VT_API_KEY:
-    print("⚠️ Warning: VIRUS_TOTAL_API_KEY not found in environment!")
+    print("⚠️ Warning: VIRUS_TOTAL_API_KEY not found in environment! It is required for the application to function.")
     exit(1)
 else:
     debug_print(f"✅ VIRUS_TOTAL_API_KEY loaded successfully: {VT_API_KEY[:4]}****")

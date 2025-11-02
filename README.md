@@ -1,94 +1,130 @@
-# URL-Analyzer
+# 🕵️‍♂️ URL-Analyzer
 
-Built by Corentin COUSTY
+Author: Corentin COUSTY  
+Repository: https://github.com/Kaldah/URL-Analyzer
 
-URL-Analyzer is a lightweight web service for detecting potentially malicious URLs. It exposes a simple HTTP API (POST /analyze) that accepts a URL and returns a risk assessment summary from reputation sources (currently VirusTotal; more adapters can be added).
+---
 
-This repository contains a minimal FastAPI implementation with a static test UI and examples for integration with SOC, SIEMs, and automation tooling. The code is modular so reputation sources and analyzers can be added or replaced easily.
+## Overview
 
-## Key features
+URL-Analyzer is a lightweight web application for detecting potentially malicious URLs. It exposes a simple HTTP API (POST `/analyze`) that takes a URL and returns a security assessment based on VirusTotal reputation data.
 
-- HTTP-based URL analysis with JSON input/output
-- Aggregates results from multiple reputation sources (malicious/harmless votes)
-- Small, modular codebase intended for automation and SIEM integration
-- Clear JSON contract for easy programmatic use
+The backend is built with FastAPI, and a small static web page is provided to test URLs directly in the browser. The project is designed to be modular — future adapters (e.g., PhishTank, Google Safe Browsing) can easily be added.
 
-## API
+---
 
-POST /analyze
+## Key Features
 
-Request (application/json):
+- Simple HTTP API (JSON in/out)
+- Integration with VirusTotal API v3
+- Modular, extensible code structure
+- Docker-ready with .env configuration
+- Static HTML/JS UI for quick testing
+- Command-line test script (`tests/test_api.py`)
 
-{
-	"url": "http://example.com"
-}
+---
 
-Response (application/json):
+## How It Works
 
-{
-	"url": "http://example.com",
-	"malicious_votes": 2,
-	"harmless_votes": 85,
-	"score": 0.02,
-	"sources": [
-		{ "name": "VirusTotal", "malicious": 1, "harmless": 10 },
-		{ "name": "PhishTank", "malicious": 1, "harmless": 75 }
-	]
-}
+1. The API exposes one endpoint: `POST /analyze`
+
+	 Example input:
+
+	 ```json
+	 { "url": "http://example.com" }
+	 ```
+
+2. The backend:
+
+	 - Sanitizes and validates the input URL
+	 - Submits it to VirusTotal (`POST /api/v3/urls`)
+	 - Polls the analysis status (`GET /api/v3/analyses/{id}`)
+	 - Returns the final vote counts
+
+	 Example response:
+
+	 ```json
+	 { "url": "http://example.com", "malicious_votes": 0, "harmless_votes": 71 }
+	 ```
+
+	 If analysis is still running:
+
+	 ```json
+	 { "detail": "Analysis still in progress, try again later." }
+	 ```
+
+	 → HTTP 202 Accepted
+
+---
+
+## API Specification
+
+`POST /analyze`
 
 Fields:
-- `url` — the analyzed URL (echoed back)
-- `malicious_votes` — aggregated count of malicious votes across configured sources
-- `harmless_votes` — aggregated count of harmless/benign votes across sources
-- `score` — normalized risk score (malicious_votes / (malicious_votes + harmless_votes)) when votes exist, otherwise 0
-- `sources` — optional per-source breakdown (helpful for triage and auditing)
 
-Notes:
-- The exact keys returned may vary depending on enabled adapters. The above contract is the recommended normalized shape for consumers.
-- In the current POC, the backend returns `url`, `malicious_votes`, `harmless_votes` (no `score` yet). The frontend hides `score` when absent.
+- `url` (string): URL to analyze
 
-Status codes:
-- `200 OK` — analysis completed; response includes votes (may be `0/0` when no votes yet)
-- `202 Accepted` — analysis still pending upstream; try again shortly
-- `500` — server not configured correctly (missing `VIRUS_TOTAL_API_KEY`)
-- `502` — upstream/network error contacting VirusTotal
+Response codes:
+
+- 200 OK – Completed
+- 202 Accepted – Pending analysis
+- 500 – Invalid API key
+- 502 – Network/upstream failure
+
+> Note: If `VIRUS_TOTAL_API_KEY` is missing at startup, the app exits with a configuration warning and will not serve HTTP requests. With an invalid key present, the endpoint returns HTTP 500.
+
+---
 
 ## Requirements
 
 - Python 3.10+ (tested with 3.12)
-- A VirusTotal API key
+- FastAPI, Uvicorn, httpx, python-dotenv
+- A valid VirusTotal API key
 
-## How to run
+---
 
-Set your VirusTotal API key as an environment variable `VIRUS_TOTAL_API_KEY`.
+## Environment Configuration
 
-### Using a .env file (recommended)
+Create a `.env` file at project root:
 
-An example env file is provided. Copy it and fill in your values:
-
-```pwsh
-# Windows (PowerShell)
-Copy-Item .env.example .env
-notepad .env   # edit VIRUS_TOTAL_API_KEY, optionally DEVELOPMENT_ENV
+```
+VIRUS_TOTAL_API_KEY=your_api_key_here
 ```
 
-```bash
-# Linux/macOS
-cp .env.example .env
-${EDITOR:-nano} .env   # edit VIRUS_TOTAL_API_KEY, optionally DEVELOPMENT_ENV
+Optionally:
+
 ```
-
-The app automatically loads `.env` via python-dotenv on startup, so you don’t need to export variables manually if `.env` exists.
-
-### Create a virtual environment (clean install)
+DEVELOPMENT_ENV=1
+```
 
 Windows (PowerShell):
 
-```pwsh
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Linux/macOS:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+---
+
+## Running the Application
+
+Local mode (recommended):
+
+Windows (PowerShell):
+
+```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Linux/macOS:
@@ -96,134 +132,132 @@ Linux/macOS:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-### Windows (PowerShell)
-
-```pwsh
-# from project root
-$env:VIRUS_TOTAL_API_KEY = "<your_api_key>"
-# optional for verbose logs
-$env:DEVELOPMENT_ENV = "1"
+pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Linux/macOS (bash/zsh)
-
-```bash
-# from project root
-export VIRUS_TOTAL_API_KEY="<your_api_key>"
-# optional for verbose logs
-export DEVELOPMENT_ENV=1
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Docker
-
-```bash
-# build
-docker build -t url-analyzer:local .
-
-# run (exposes http://localhost:8000)
-docker run --rm -p 8000:8000 \
-  -e VIRUS_TOTAL_API_KEY="<your_api_key>" \
-  url-analyzer:local
-```
-
-Alternatively, pass your local `.env` directly:
-
-```bash
-docker run --rm -p 8000:8000 --env-file .env url-analyzer:local
-```
-
-Open http://localhost:8000/ to access the test UI.
-
-### Quick API calls
-
-Use curl or PowerShell to POST a URL to the service. Replace <HOST> with your service host (e.g., http://localhost:8000).
-
-PowerShell (recommended on Windows):
-
-```pwsh
-Invoke-RestMethod -Method POST -Uri "http://<HOST>/analyze" -ContentType "application/json" -Body (@{ url = 'http://example.com' } | ConvertTo-Json)
-```
-
-curl (Linux/macOS/WSL/PowerShell alias):
-
-```bash
-curl -X POST "http://<HOST>/analyze" -H "Content-Type: application/json" -d '{"url":"http://example.com"}'
-```
-
-Example response (shape may vary):
-
-```json
-{
-  "url": "http://example.com",
-  "malicious_votes": 2,
-  "harmless_votes": 85
-}
-```
-
-Note: If the server returns `202 Accepted`, the analysis is still processing at VirusTotal. Retry after a few seconds — the web UI shows a pending banner with a Retry button.
-
-## How it works (quickly)
-
-- The FastAPI app exposes `POST /analyze`.
-- The VirusTotal adapter (`app/services/virus_total.py`) submits the URL for analysis, then polls the analysis endpoint. If status becomes `completed`, it returns the votes (even `0/0`). If still `queued/running` after several attempts, it returns `202` to indicate pending.
-- The result returns a normalized shape: `{ url, malicious_votes, harmless_votes }`.
-- The static page (`/`) lets you try URLs and renders the JSON result.
-
-Future adapters (e.g., PhishTank, Google Safe Browsing) can be added following the same interface and aggregated into totals.
-
-## Integration notes
-
-- Aggregation: The service aggregates vote counts from configured reputation adapters and returns both totals and a per-source breakdown for triage.
-- Extensibility: Add new reputation adapters as separate modules that implement a simple interface (query(url) -> {malicious, harmless, raw}).
-- Caching: For production use, enable result caching to reduce API calls to external reputation providers and improve throughput.
-- Rate limiting & API keys: Configure per-source API keys and rate limits; fail gracefully when a source is unavailable and still return partial results.
-
-## Security considerations
-
-- Treat the input URL as untrusted. If the service dereferences URLs (fetches the content), enforce strict timeouts and avoid executing any returned content.
-- Store third-party API keys securely (environment variables or secret store), not in source control.
-
-## Contributing
-
-Contributions are welcome. Suggested small improvements:
-
-- Add new reputation adapters (VirusTotal, PhishTank, Google Safe Browsing, etc.)
-- Add tests for the adapter interface and aggregation logic
-- Add docker-compose or deployment manifests for common environments
-
-Please open issues or PRs with clear descriptions and small, focused changes.
-
-## Running the tests
-
-The test runner in `tests/test_api.py` sends HTTP requests to a running server. Start the app first (see above), then in another terminal:
-
-### Windows (PowerShell)
-
-```pwsh
-python .\tests\test_api.py
-```
-
-### Linux/macOS
-
-```bash
-python ./tests/test_api.py
-```
-
-Notes:
-- Tests require the `VIRUS_TOTAL_API_KEY` to be set in the server's environment.
-- The script compares vote counts within a tolerance (these numbers vary over time).
-
-## License
-
-This project is provided under the MIT License. See LICENSE file for details.
+Then open http://localhost:8000
 
 ---
 
-Made with care by Corentin COUSTY.
+### Run with Docker
+
+```bash
+docker build -t url-analyzer .
+docker run --rm -p 8000:8000 --env-file .env url-analyzer
+```
+
+Open http://localhost:8000
+
+---
+
+## Try it from the command line
+
+Make sure the app is running locally on http://127.0.0.1:8000 (see steps above), then:
+
+Windows (PowerShell):
+
+```powershell
+$Body = @{ url = "http://example.com" } | ConvertTo-Json
+Invoke-RestMethod -Uri http://127.0.0.1:8000/analyze -Method POST -ContentType 'application/json' -Body $Body
+```
+
+Linux/macOS:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/analyze \
+	-H 'Content-Type: application/json' \
+	-d '{"url":"http://example.com"}'
+```
+
+If the analysis is still pending, the server will return HTTP 202. To see the status code with curl, add `-i`.
+
+---
+
+## Running the Tests
+
+Start the app, then run:
+
+```bash
+python tests/test_api.py
+```
+
+Example output:
+
+```
+🔍 Running 2 tests against http://127.0.0.1:8000/analyze
+🧪 Test #0 → http://example.com
+✅ OK — within expected range
+🧪 Test #1 → http://dfwdiesel.net
+✅ OK — within expected range
+```
+
+Test data (`tests/data.json`):
+
+```json
+[
+	{
+		"test_number": 0,
+		"url": "http://example.com",
+		"expected_output": { "malicious_votes": 0, "harmless_votes": 71 }
+	},
+	{
+		"test_number": 1,
+		"url": "http://dfwdiesel.net",
+		"expected_output": { "malicious_votes": 4, "harmless_votes": 63 }
+	}
+]
+```
+
+---
+
+## Project Structure
+
+```
+URL-Analyzer/
+├── app/
+│   ├── main.py                 # FastAPI entrypoint
+│   ├── models.py               # Pydantic schemas
+│   ├── services/
+│   │   └── virus_total.py      # VirusTotal adapter
+│   ├── utils.py                # URL sanitization helpers
+│   └── static/
+│       ├── index.html          # Test UI
+│       ├── script.js           # Frontend logic
+│       └── style.css           # Styles for the UI
+├── tests/
+│   ├── data.json
+│   └── test_api.py
+├── .env.example
+├── requirements.txt
+├── Dockerfile
+└── README.md
+```
+
+---
+
+## Security Notes
+
+- The service never fetches page content — only VirusTotal data.
+- API keys are stored via environment variables, never in Git.
+- Use `.env.example` for sharing configuration templates.
+
+---
+
+## Future Improvements
+
+- Add caching (SQLite/Redis)
+- Add new reputation adapters
+- Add pytest-based automated tests
+- Add CI/CD pipeline with GitHub Actions
+
+---
+
+## License
+
+Released under the MIT License. See `LICENSE` for details.
+
+---
+
+Made with care by Corentin COUSTY
 

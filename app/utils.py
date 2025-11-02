@@ -17,5 +17,5 @@ def debug_print(message: str):
         message (str): The debug message to print.
     """
     # Check if in development environment
-    if os.getenv("DEVELOPMENT_ENV"):
+    if os.getenv("DEVELOPMENT_ENV", False) in [True, "True", "true", "1"]:
         print(f"[DEBUG] {message}")

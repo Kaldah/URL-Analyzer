@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>URL Analyzer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🔎 URL Analyzer</h1>
+    <form id="analyzeForm" class="form" aria-label="Analyze URL">
+      <input type="text" id="urlInput" placeholder="https://example.com" required />
+      <button type="submit" id="submitBtn">Analyze</button>
+    </form>
+
+    <div id="messages" aria-live="polite"></div>
+    <div id="result" class="result" aria-live="polite"></div>
+  </div>
+
+  <footer class="footer" aria-label="Attribution">
+    <span>Built by <strong>Corentin COUSTY</strong></span>
+  </footer>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+[
+    {
+        "test_number": 0,
+        "url": "http://example.com",
+        "expected_output": {
+            "malicious_votes": 0,
+            "harmless_votes": 71
+        }
+    },
+    {
+        "test_number": 1,
+        "url": "http://dfwdiesel.net",
+        "expected_output": {
+            "malicious_votes": 4,
+            "harmless_votes": 63
+        }
+    }
+]
